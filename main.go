@@ -21,6 +21,14 @@ type philosopher struct {
 	finishEat           chan int
 }
 
+/*
+eat allows a philosopher to request to eat, wait for permission, lock the forks, eat, and then release the forks.
+
+- If the philosopher has eaten 3 times, it prints a message and signals completion.
+- Otherwise, it requests permission to eat.
+- If permitted, it locks the left and right forks, then eats, increments the count of meals eaten, prints status messages, and unlocks the forks.
+- Finally, it signals that it has finished eating.
+*/
 func (p philosopher) eat() {
 	for {
 		if p.numberOfTimeEaten == 3 {
@@ -47,6 +55,15 @@ func (p philosopher) eat() {
 	}
 }
 
+/*
+main initializes the system with philosophers and forks, sets up communication channels, and starts the host and philosopher goroutines.
+
+- It creates a specified number of forks and philosophers.
+- Initializes channels for communication between philosophers and the host.
+- Starts the host goroutine to manage eating requests and completions.
+- Starts goroutines for each philosopher to simulate their eating and thinking process.
+- Waits for all philosophers to complete their eating before printing a final message.
+*/
 func main() {
 	count := 5
 	waitingGroup.Add(count)
@@ -82,6 +99,14 @@ func main() {
 	fmt.Printf("All philosophers have eaten")
 }
 
+/*
+host manages the synchronization of eating requests from philosophers.
+
+- It tracks the number of philosophers currently eating with the `numberOfPeopleEating` counter.
+- Processes requests from philosophers to start eating. Allows up to 2 philosophers to eat simultaneously.
+- Updates the count of eating philosophers based on requests and finishes.
+- Sends signals to philosophers about whether they can start eating or not.
+*/
 func host(requestEat, startEat, finishEat chan int) {
 	numberOfPeopleEating := 0
 
