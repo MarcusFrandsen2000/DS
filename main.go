@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+var waitingGroup sync.WaitGroup
+
 type fork struct {
 	sync.Mutex
 }
@@ -13,41 +15,58 @@ type fork struct {
 type philosopher struct {
 	id                  int
 	leftFork, rightFork *fork
-	eats                int
+	numberOfTimeEaten   int
 	requestEat          chan int
 	startEat            chan int
 	finishEat           chan int
 }
 
-var gw sync.WaitGroup
+/*
+eat allows a philosopher to request to eat, wait for permission, lock the forks, eat, and then release the forks.
 
+- If the philosopher has eaten 3 times, it prints a message and signals completion.
+- Otherwise, it requests permission to eat.
+- If permitted, it locks the left and right forks, then eats, increments the count of meals eaten, prints status messages, and unlocks the forks.
+- Finally, it signals that it has finished eating.
+*/
 func (p philosopher) eat() {
-	if p.eats == 3 {
-		fmt.Printf("Philosopher %d has eaten %d meals\n", p.id, p.eats)
-		gw.Done()
-		return
-	}
+	for {
+		if p.numberOfTimeEaten == 3 {
+			fmt.Printf("Philosopher %d has eaten %d meals\n", p.id, p.numberOfTimeEaten)
+			waitingGroup.Done()
+			return
+		}
 
-	p.requestEat <- p.id
+		p.requestEat <- 1
 
-	if eatingAllowed := <-p.startEat; eatingAllowed == 1 {
-		p.leftFork.Lock()
-		p.rightFork.Lock()
+		if eatingAllowed := <-p.startEat; eatingAllowed == 1 {
+			p.leftFork.Lock()
+			p.rightFork.Lock()
 
-		fmt.Printf("Philosopher %d is eating\n", p.id)
-		time.Sleep(3 * time.Second)
-		p.eats++
-		fmt.Printf("Philosopher %d is finished eating\n", p.id)
-		p.leftFork.Unlock()
-		p.rightFork.Unlock()
+			fmt.Printf("Philosopher %d is eating\n", p.id)
+			time.Sleep(time.Second)
+			p.numberOfTimeEaten++
+			fmt.Printf("Philosopher %d is thinking\n", p.id)
+			p.leftFork.Unlock()
+			p.rightFork.Unlock()
 
-		p.finishEat <- p.id
+			p.finishEat <- 1
+		}
 	}
 }
 
+/*
+main initializes the system with philosophers and forks, sets up communication channels, and starts the host and philosopher goroutines.
+
+- It creates a specified number of forks and philosophers.
+- Initializes channels for communication between philosophers and the host.
+- Starts the host goroutine to manage eating requests and completions.
+- Starts goroutines for each philosopher to simulate their eating and thinking process.
+- Waits for all philosophers to complete their eating before printing a final message.
+*/
 func main() {
 	count := 5
-	gw.Add(count)
+	waitingGroup.Add(count)
 
 	forks := make([]*fork, count)
 	philosophers := make([]*philosopher, count)
@@ -61,13 +80,13 @@ func main() {
 
 	for i := 0; i < count; i++ {
 		philosophers[i] = &philosopher{
-			id:         i,
-			leftFork:   forks[i],
-			rightFork:  forks[(i+1)%5],
-			eats:       0,
-			requestEat: requestEat,
-			startEat:   startEat,
-			finishEat:  finishEat,
+			id:                i + 1,
+			leftFork:          forks[i],
+			rightFork:         forks[(i+1)%5],
+			numberOfTimeEaten: 0,
+			requestEat:        requestEat,
+			startEat:          startEat,
+			finishEat:         finishEat,
 		}
 	}
 
@@ -76,29 +95,43 @@ func main() {
 		go p.eat()
 	}
 
-	gw.Wait()
+	waitingGroup.Wait()
 	fmt.Printf("All philosophers have eaten")
 }
 
+/*
+host manages the synchronization of eating requests from philosophers.
+
+- It tracks the number of philosophers currently eating with the `numberOfPeopleEating` counter.
+- Processes requests from philosophers to start eating. Allows up to 2 philosophers to eat simultaneously.
+- Updates the count of eating philosophers based on requests and finishes.
+- Sends signals to philosophers about whether they can start eating or not.
+*/
 func host(requestEat, startEat, finishEat chan int) {
-	philosopherID := make(map[int]string)
+	numberOfPeopleEating := 0
 
 	defer func() {
-		fmt.Print("Hi")
 		return
 	}()
 	for {
 		select {
-		case id := <-requestEat:
-			if len(philosopherID) < 2 {
-				philosopherID[id] = "Eating"
+		case incrementAmount := <-requestEat:
+			if numberOfPeopleEating < 2 {
+				numberOfPeopleEating = numberOfPeopleEating + incrementAmount
 				startEat <- 1
 			} else {
 				startEat <- 0
 			}
-		case id := <-finishEat:
-			fmt.Print("What up?\n")
-			delete(philosopherID, id)
+		case decrementAmount := <-finishEat:
+			numberOfPeopleEating = numberOfPeopleEating - decrementAmount
 		}
 	}
 }
+
+/*
+The host function limits the number of concurrent eaters, which prevents contention and possible deadlock.
+
+Channels are used for synchronization, ensuring that philosophers can only proceed when allowed.
+
+The numberOfPeopleEating counter accurately reflects the number of philosophers eating, and forks are managed to avoid deadlock.
+*/
