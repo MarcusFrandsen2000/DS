@@ -8,17 +8,14 @@ import (
 
 var waitingGroup sync.WaitGroup
 
-type fork struct {
-	sync.Mutex
-}
-
 type philosopher struct {
-	id                  int
-	leftFork, rightFork *fork
-	numberOfTimeEaten   int
-	requestEat          chan int
-	startEat            chan int
-	finishEat           chan int
+	id                int
+	leftFork          chan int
+	rightFork         chan int
+	numberOfTimeEaten int
+	requestEat        chan int
+	startEat          chan int
+	finishEat         chan int
 }
 
 /*
@@ -40,16 +37,15 @@ func (p philosopher) eat() {
 		p.requestEat <- 1
 
 		if eatingAllowed := <-p.startEat; eatingAllowed == 1 {
-			p.leftFork.Lock()
-			p.rightFork.Lock()
+			<-p.leftFork
+			<-p.rightFork
 
 			fmt.Printf("Philosopher %d is eating\n", p.id)
 			time.Sleep(time.Second)
 			p.numberOfTimeEaten++
 			fmt.Printf("Philosopher %d is thinking\n", p.id)
-			p.leftFork.Unlock()
-			p.rightFork.Unlock()
-
+			p.leftFork <- 1
+			p.rightFork <- 1
 			p.finishEat <- 1
 		}
 	}
@@ -68,14 +64,15 @@ func main() {
 	count := 5
 	waitingGroup.Add(count)
 
-	forks := make([]*fork, count)
+	forks := make([]chan int, count)
 	philosophers := make([]*philosopher, count)
 	requestEat := make(chan int)
 	startEat := make(chan int)
 	finishEat := make(chan int)
 
 	for i := 0; i < count; i++ {
-		forks[i] = new(fork)
+		forks[i] = make(chan int, 1)
+		forks[i] <- 1
 	}
 
 	for i := 0; i < count; i++ {
