@@ -19,12 +19,7 @@ type philosopher struct {
 }
 
 /*
-eat allows a philosopher to request to eat, wait for permission, lock the forks, eat, and then release the forks.
-
-- If the philosopher has eaten 3 times, it prints a message and signals completion.
-- Otherwise, it requests permission to eat.
-- If permitted, it locks the left and right forks, then eats, increments the count of meals eaten, prints status messages, and unlocks the forks.
-- Finally, it signals that it has finished eating.
+Each philosopher repeatedly attempts to eat until they’ve eaten three times. They request to eat via the requestEat channel. The host grants permission by sending 1 on the startEat channel, the philosopher picks up the forks if and only if a message is stored in the channel. The philospher then eats and then returns the forks (sending back to the fork channels). After finishing, they notify the host via the finishEat channel. When not eating the philosophers think.
 */
 func (p philosopher) eat() {
 	for {
@@ -52,13 +47,7 @@ func (p philosopher) eat() {
 }
 
 /*
-main initializes the system with philosophers and forks, sets up communication channels, and starts the host and philosopher goroutines.
-
-- It creates a specified number of forks and philosophers.
-- Initializes channels for communication between philosophers and the host.
-- Starts the host goroutine to manage eating requests and completions.
-- Starts goroutines for each philosopher to simulate their eating and thinking process.
-- Waits for all philosophers to complete their eating before printing a final message.
+Initializes the system by setting up the philosophers and forks, creating buffered channels for each fork. It creates the philosophers, each with its own left and right fork channels. The host function is run concurrently to manage the dining process, while each philosopher’s eat() function is executed as a goroutine. The sync.WaitGroup ensures the program waits for all philosophers to eat three times before terminating.
 */
 func main() {
 	count := 5
@@ -97,12 +86,7 @@ func main() {
 }
 
 /*
-host manages the synchronization of eating requests from philosophers.
-
-- It tracks the number of philosophers currently eating with the `numberOfPeopleEating` counter.
-- Processes requests from philosophers to start eating. Allows up to 2 philosophers to eat simultaneously.
-- Updates the count of eating philosophers based on requests and finishes.
-- Sends signals to philosophers about whether they can start eating or not.
+The host function controls how many philosophers can eat simultaneously. It listens for signals from the philosophers via the requestEat channel. If fewer than two philosophers are eating, the host allows the philosopher to eat by sending 1 on the startEat channel and then increments the count of philosophers eating. Otherwise, it sends 0 to deny permission. The finishEat channel decrements the count of philosophers eating when they finish their meal.
 */
 func host(requestEat, startEat, finishEat chan int) {
 	numberOfPeopleEating := 0
@@ -126,9 +110,5 @@ func host(requestEat, startEat, finishEat chan int) {
 }
 
 /*
-The host function limits the number of concurrent eaters, which prevents contention and possible deadlock.
-
-Channels are used for synchronization, ensuring that philosophers can only proceed when allowed.
-
-The numberOfPeopleEating counter accurately reflects the number of philosophers eating, and forks are managed to avoid deadlock.
+The system avoids deadlock by limiting the number of philosophers allowed to eat simultaneously. The host function ensures that at most two philosophers can eat at the same time. This prevents the system from deadlocking, since only two philosophers can eat at once, and therefore at least one pair of forks is always free for the next philosopher to eat.
 */
