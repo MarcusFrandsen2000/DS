@@ -10,8 +10,8 @@ var waitingGroup sync.WaitGroup
 
 type philosopher struct {
 	id                int
-	leftFork          chan int
-	rightFork         chan int
+	leftFork          chan bool
+	rightFork         chan bool
 	numberOfTimeEaten int
 	requestEat        chan int
 	startEat          chan int
@@ -19,7 +19,7 @@ type philosopher struct {
 }
 
 /*
-Each philosopher repeatedly attempts to eat until they’ve eaten three times. They request to eat via the requestEat channel. The host grants permission by sending 1 on the startEat channel, the philosopher picks up the forks if and only if a message is stored in the channel. The philospher then eats and then returns the forks (sending back to the fork channels). After finishing, they notify the host via the finishEat channel. When not eating the philosophers think.
+Each philosopher repeatedly attempts to eat until they’ve eaten three times. They request to eat via the requestEat channel. The host grants permission by sending 1 on the startEat channel. Once permission is granted, the philosopher picks up the left and right forks by sending a signal to their respective fork channels. After eating, the philosopher returns the forks by receiving from the fork channels. Finally, they notify the host via the finishEat channel. When not eating, the philosophers think.
 */
 func (p philosopher) eat() {
 	for {
@@ -32,36 +32,43 @@ func (p philosopher) eat() {
 		p.requestEat <- 1
 
 		if eatingAllowed := <-p.startEat; eatingAllowed == 1 {
-			<-p.leftFork
-			<-p.rightFork
+			p.leftFork <- true
+			p.rightFork <- true
 
 			fmt.Printf("Philosopher %d is eating\n", p.id)
 			time.Sleep(time.Second)
 			p.numberOfTimeEaten++
 			fmt.Printf("Philosopher %d is thinking\n", p.id)
-			p.leftFork <- 1
-			p.rightFork <- 1
+			<-p.leftFork
+			<-p.rightFork
 			p.finishEat <- 1
 		}
 	}
 }
 
+func fork(forkChan chan bool) {
+	for {
+		<-forkChan
+		forkChan <- true
+	}
+}
+
 /*
-Initializes the system by setting up the philosophers and forks, creating buffered channels for each fork. It creates the philosophers, each with its own left and right fork channels. The host function is run concurrently to manage the dining process, while each philosopher’s eat() function is executed as a goroutine. The sync.WaitGroup ensures the program waits for all philosophers to eat three times before terminating.
+Initializes the system by setting up philosophers and forks. It creates a channel for each fork, which is handled by the fork goroutines. Each philosopher is initialized with a left and right fork channel, and the host function is started concurrently to manage how many philosophers can eat at a time. Each philosopher’s eat() function runs as a goroutine. The sync.WaitGroup ensures the program waits for all philosophers to eat three times before terminating.
 */
 func main() {
 	count := 5
 	waitingGroup.Add(count)
 
-	forks := make([]chan int, count)
+	forks := make([]chan bool, count)
 	philosophers := make([]*philosopher, count)
 	requestEat := make(chan int)
 	startEat := make(chan int)
 	finishEat := make(chan int)
 
 	for i := 0; i < count; i++ {
-		forks[i] = make(chan int, 1)
-		forks[i] <- 1
+		forks[i] = make(chan bool, 1)
+		go fork(forks[i])
 	}
 
 	for i := 0; i < count; i++ {
