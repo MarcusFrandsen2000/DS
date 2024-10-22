@@ -1,4 +1,4 @@
-package DS
+package system
 
 import (
 	"context"
@@ -27,18 +27,18 @@ func (s *ChittyChatService) Join(c context.Context, req *pb.JoinRequest) (*pb.Jo
 	s.lamport_time++
 
 	if _, exists := s.participants[req.ParticipantId]; exists {
-		return nil, fmt.Errorf("Participant %s already exists", req.Name)
+		return nil, fmt.Errorf("Participant %s already exists", req.)
 	}
 
 	s.participants[req.ParticipantId] = make(chan *pb.BroadcastMessage, 10)
 
 	joinMessage := &pb.BroadcastMessage{
-		ParticipantID: req.ParticipantID,
+		ParticipantId: req.ParticipantId,
 		Message:       fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time %d", req.Name, s.lamport_time),
 		LamportTime:   s.lamport_time,
 	}
 
-	s.broadcast(joinMessage, req.ParticipantID) //Broadcast the joinMessage to all participants using the broadcast() method
+	s.broadcast(joinMessage, req.ParticipantId) //Broadcast the joinMessage to all participants using the broadcast() method
 
 	return &pb.JoinResponse{ //Returns the joinResponse to the joining client, to know that the join was succesful
 		Message:     joinMessage.Message,
