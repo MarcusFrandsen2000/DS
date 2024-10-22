@@ -27,14 +27,14 @@ func (s *ChittyChatService) Join(c context.Context, req *pb.JoinRequest) (*pb.Jo
 	s.lamport_time++
 
 	if _, exists := s.participants[req.ParticipantId]; exists {
-		return nil, fmt.Errorf("Participant %s already exists", req.)
+		return nil, fmt.Errorf("participant %s already exists", req.ParticipantId)
 	}
 
 	s.participants[req.ParticipantId] = make(chan *pb.BroadcastMessage, 10)
 
 	joinMessage := &pb.BroadcastMessage{
 		ParticipantId: req.ParticipantId,
-		Message:       fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time %d", req.Name, s.lamport_time),
+		Message:       fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time %d", req.ParticipantId, s.lamport_time),
 		LamportTime:   s.lamport_time,
 	}
 
@@ -54,16 +54,16 @@ func (s *ChittyChatService) Publish(c context.Context, req *pb.PublishRequest) (
 	s.lamport_time++
 
 	if _, exists := s.participants[req.ParticipantId]; !exists {
-		return nil, fmt.Errorf("Participant %s does not exists", req.Name)
+		return nil, fmt.Errorf("participant %s does not exists", req.ParticipantId)
 	}
 
 	publishMessage := &pb.BroadcastMessage{
-		ParticipantID: req.ParticipantID,
+		ParticipantId: req.ParticipantId,
 		Message:       req.Message,
 		LamportTime:   s.lamport_time,
 	}
 
-	s.broadcast(publishMessage, req.ParticipantID) //Publish the publishMessage to all participants
+	s.broadcast(publishMessage, req.ParticipantId) //Publish the publishMessage to all participants
 
 	return &pb.PublishResponse{ //Returns the publishResponse to the client publishing the message, to know that the publish was succesful
 		Message:     "Message succesfully published",
@@ -81,32 +81,32 @@ func (s *ChittyChatService) Leave(c context.Context, req *pb.LeaveRequest) (*pb.
 	s.lamport_time++
 
 	if _, exists := s.participants[req.ParticipantId]; !exists {
-		return nil, fmt.Errorf("Participant %s does not exists", req.Name)
+		return nil, fmt.Errorf("participant %s does not exists", req.ParticipantId)
 	}
 
-	delete(s.participants, req.ParticipantID) //Deletes the leaving participant and the corresponding channel value from the map
+	delete(s.participants, req.ParticipantId) //Deletes the leaving participant and the corresponding channel value from the map
 
 	leaveMessage := &pb.BroadcastMessage{
-		ParticipantID: req.ParticipantID,
-		Message:       fmt.Sprintf("Participant %s has left Chitty-Chat at Lamport time %d", req.Name, s.lamport_time),
+		ParticipantId: req.ParticipantId,
+		Message:       fmt.Sprintf("Participant %s has left Chitty-Chat at Lamport time %d", req.ParticipantId, s.lamport_time),
 		LamportTime:   s.lamport_time,
 	}
 
-	s.broadcast(leaveMessage, req.ParticipantID) //Broadcast the leaveMessage to all participants using the broadcast() method
+	s.broadcast(leaveMessage, req.ParticipantId) //Broadcast the leaveMessage to all participants using the broadcast() method
 
-	return &pb.JoinResponse{ //Returns the leaveMessage to the leaving client, to know that the leave was succesful
+	return &pb.LeaveResponse{ //Returns the leaveMessage to the leaving client, to know that the leave was succesful
 		Message:     leaveMessage.Message,
 		LamportTime: s.lamport_time,
 	}, nil
 }
 
-func (s *ChittyChatService) Broadcast(msg *BroadcastMessage, grpc grpc.ServerStreamingServer[BroadcastMessage]) error {
+func (s *ChittyChatService) Broadcast(msg *pb.BroadcastMessage, grpc grpc.ServerStreamingServer[pb.BroadcastMessage]) error {
 	s.mu.Lock()
 	msgChannel, exists := s.participants[msg.ParticipantId]
 	defer s.mu.Unlock()
 
 	if !exists {
-		return fmt.Errorf("Participant %s does not exists", msg.ParticipantId)
+		return fmt.Errorf("participant %s does not exists", msg.ParticipantId)
 	}
 
 	for message := range msgChannel {
