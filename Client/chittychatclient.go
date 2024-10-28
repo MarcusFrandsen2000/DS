@@ -1,12 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"log"
 	"os"
-	"sync"
 
 	pb "chittychat/proto"
+
 	"google.golang.org/grpc"
 )
 
@@ -24,14 +25,12 @@ func main() {
 	defer conn.Close()
 
 	client := pb.NewChittyChatServiceClient(conn)
-	
 
 	// Join the chat
-	joinResp, err := client.Join(context.Background(), &pb.JoinRequest{ParticipantId: participantID})
+	_, err = client.Join(context.Background(), &pb.JoinRequest{ParticipantId: participantID})
 	if err != nil {
 		log.Fatalf("Failed to join the chat: %v", err)
 	}
-	log.Printf("%s\n", joinResp.Message)
 
 	// Start listening for broadcast messages in a separate goroutine
 	go func() {
@@ -44,19 +43,30 @@ func main() {
 			if err != nil {
 				log.Printf("Error receiving message: %v", err)
 			}
-			log.Printf("%s\n", msg.Message)
+			log.Printf("\"%s\" at Lamport Time: %d\n", msg.Message, msg.LamportTime)
 		}
 	}()
-	
-	// Publish a message
-	publishResp, err := client.Publish(context.Background(), &pb.PublishRequest{
-		ParticipantId: participantID,
-		Message:       "Hello, Chitty-Chat!",
-	})
-	if err != nil {
-		log.Fatalf("Failed to publish message: %v", err)
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+		if scanner.Scan() {
+			message := scanner.Text()
+
+			if message == "exit" {
+				break
+			}
+
+			// Publish a message
+			_, err := client.Publish(context.Background(), &pb.PublishRequest{
+				ParticipantId: participantID,
+				Message:       message,
+			})
+			if err != nil {
+				log.Fatalf("Failed to publish message: %v", err)
+			}
+		}
 	}
-	log.Printf("%s\n", publishResp.Message)
 
 	// Leave the chat
 	leaveResp, err := client.Leave(context.Background(), &pb.LeaveRequest{ParticipantId: participantID})
@@ -65,12 +75,4 @@ func main() {
 	}
 	log.Printf("%s\n", leaveResp.Message)
 
-	// Wait for all goroutines to finish
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		<-context.Background().Done()
-	}()
-	wg.Wait()
 }

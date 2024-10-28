@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/exec"
+	"runtime"
+	"strconv"
 	"sync"
 
 	pb "chittychat/proto"
@@ -35,6 +39,16 @@ func main() {
 		participants: make(map[string]chan *pb.BroadcastMessage),
 	})
 
+	// Simulate opening multiple clients
+	for i := 0; i < 3; i++ { // Open 3 clients
+		log.Printf("hej")
+		username := "User" + strconv.Itoa(i+1)
+		err := openClient(username)
+		if err != nil {
+			fmt.Printf("Error opening client: %v\n", err)
+		}
+	}
+
 	// Log server start and start serving
 	log.Printf("Server is listening on %v", lis.Addr())
 	if err := grpcServer.Serve(lis); err != nil {
@@ -58,7 +72,7 @@ func (s *ChittyChatService) Join(c context.Context, req *pb.JoinRequest) (*pb.Jo
 
 	joinMessage := &pb.BroadcastMessage{
 		ParticipantId: req.ParticipantId,
-		Message:       fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time %d", req.ParticipantId, s.lamport_time),
+		Message:       fmt.Sprintf("Participant %s joined Chitty-Chat", req.ParticipantId),
 		LamportTime:   s.lamport_time,
 	}
 
@@ -125,7 +139,7 @@ func (s *ChittyChatService) Leave(c context.Context, req *pb.LeaveRequest) (*pb.
 }
 
 func (s *ChittyChatService) Broadcast(msg *pb.BroadcastMessage, grpc grpc.ServerStreamingServer[pb.BroadcastMessage]) error {
-	participantId := msg.ParticipantId;
+	participantId := msg.ParticipantId
 	s.mu.Lock()
 	msgChannel, exists := s.participants[participantId]
 	s.mu.Unlock()
@@ -152,4 +166,35 @@ func (s *ChittyChatService) broadcast(msg *pb.BroadcastMessage) {
 	for _, ch := range s.participants {
 		ch <- msg
 	}
+}
+
+func openClient(username string) error {
+	var cmd *exec.Cmd
+
+	// Get the current directory (the one from which the server was run)
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("could not get current directory: %v", err)
+	}
+
+	// Define the command to change to the Client directory and run the client with the username
+	clientDir := workingDir + "/../Client" // Adjust this path as needed based on your project structure
+
+	// Detect the operating system
+	switch runtime.GOOS {
+	case "linux":
+		// Open a new terminal and run the client on Linux (gnome-terminal)
+		cmd = exec.Command("gnome-terminal", "--", "go", "run", fmt.Sprintf("cd %s && go run chittychatclient.go %s", clientDir, username))
+	case "darwin":
+		// Open a new terminal and run the client on macOS (osascript)
+		cmd = exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "cd %s && go run chittychatclient.go %s"`, clientDir, username))
+	case "windows":
+		// Open a new terminal and run the client on Windows (start command)
+		cmd = exec.Command("cmd", "/c", "start", "cmd", "/k", fmt.Sprintf("cd %s && go run chittychatclient.go %s", clientDir, username))
+	default:
+		return fmt.Errorf("unsupported platform")
+	}
+
+	// Start the command
+	return cmd.Start()
 }
