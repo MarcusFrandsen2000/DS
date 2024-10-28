@@ -96,7 +96,7 @@ func (s *ChittyChatService) Publish(c context.Context, req *pb.PublishRequest) (
 
 	publishMessage := &pb.BroadcastMessage{
 		ParticipantId: req.ParticipantId,
-		Message:       req.Message,
+		Message:       "\"" + req.Message + "\"",
 		LamportTime:   s.lamport_time,
 	}
 
@@ -125,7 +125,7 @@ func (s *ChittyChatService) Leave(c context.Context, req *pb.LeaveRequest) (*pb.
 
 	leaveMessage := &pb.BroadcastMessage{
 		ParticipantId: req.ParticipantId,
-		Message:       fmt.Sprintf("Participant %s has left Chitty-Chat at Lamport time %d", req.ParticipantId, s.lamport_time),
+		Message:       fmt.Sprintf("Participant %s has left Chitty-Chat", req.ParticipantId),
 		LamportTime:   s.lamport_time,
 	}
 

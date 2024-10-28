@@ -43,7 +43,7 @@ func main() {
 			if err != nil {
 				log.Printf("Error receiving message: %v", err)
 			}
-			log.Printf("\"%s\" at Lamport Time: %d\n", msg.Message, msg.LamportTime)
+			log.Printf("%s at Lamport Time: %d\n", msg.Message, msg.LamportTime)
 		}
 	}()
 
