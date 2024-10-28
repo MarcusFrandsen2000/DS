@@ -41,7 +41,6 @@ func main() {
 
 	// Simulate opening multiple clients
 	for i := 0; i < 3; i++ { // Open 3 clients
-		log.Printf("hej")
 		username := "User" + strconv.Itoa(i+1)
 		err := openClient(username)
 		if err != nil {
