@@ -1,0 +1,25 @@
+syntax = "proto3"; 
+
+package mutual_exclusion; 
+option go_package = "./mutual_exclusion";
+
+service MutualExclusionService {
+    rpc Request(RequestAccess) returns (Empty);
+    rpc Grant(GrantAccess) returns (Empty);
+    rpc Release(ReleaseAccess) returns (Empty);
+}
+
+message RequestAccess {
+    int32 node_id = 1;
+    int64 timestamp = 2;
+}
+
+message GrantAccess {
+    int32 node_id = 1;
+}
+
+message ReleaseAccess {
+    int32 node_id = 1;
+}
+
+message Empty {}
