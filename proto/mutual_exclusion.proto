@@ -1,7 +1,7 @@
 syntax = "proto3"; 
 
 package mutual_exclusion; 
-option go_package = "./mutual_exclusion";
+option go_package = "./proto";
 
 service MutualExclusionService {
     rpc Request(RequestAccess) returns (Empty);

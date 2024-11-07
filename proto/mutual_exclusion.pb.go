@@ -4,7 +4,7 @@
 // 	protoc        v5.28.1
 // source: mutual_exclusion.proto
 
-package mutual_exclusion
+package proto
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
