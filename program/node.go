@@ -26,6 +26,7 @@ type Node struct {
     ID       int32
     HasToken bool
     NextNode int32
+    PrevNode int32
     NodeConn map[int32]pb.MutualExclusionServiceClient
 }
 
@@ -35,6 +36,7 @@ func NewNode(id int32) *Node {
         HasToken: id == 1, // Node 1 starts with the token
         NodeConn: make(map[int32]pb.MutualExclusionServiceClient),
         NextNode: int32((id % int32(len(nodeAddresses))) + 1), // Determine the next node in the ring
+        PrevNode: int32((id-2+int32(len(nodeAddresses))) % int32(len(nodeAddresses)) + 1),
     }
     for i, addr := range nodeAddresses {
         if int32(i+1) != n.ID {
@@ -131,7 +133,7 @@ func (n *Node) Release(ctx context.Context, req *pb.ReleaseAccess) (*pb.Empty, e
     mu.Lock()
     defer mu.Unlock()
 
-    fmt.Printf("Node %d received the token release from Node %d\n", n.ID, req.NodeId)
+    fmt.Printf("Node %d received the token release from Node %d\n", n.ID, n.PrevNode)
     n.HasToken = true
 
     return &pb.Empty{}, nil
