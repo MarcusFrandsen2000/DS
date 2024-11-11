@@ -1,4 +1,4 @@
-module mutual_exclusion
+module DS
 
 go 1.23.0
 

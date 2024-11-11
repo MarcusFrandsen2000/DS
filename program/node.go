@@ -10,8 +10,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	"mutual_exclusion/proto"
+	pb "DS/proto"
 )
+
 
 var (
 	// Hardcoded list of peer addresses
@@ -26,14 +27,14 @@ type Node struct {
 	HasToken  bool
 	NextNode  int32
 	PrevNode  int32
-	NodeConn  map[int32]MutualExclusionServiceClient
+	NodeConn  map[int32]pb.MutualExclusionServiceClient
 }
 
 func NewNode(id int32) *Node {
 	n := &Node{
 		ID:       id,
 		HasToken: id == 1, // Node 1 starts with the token
-		NodeConn: make(map[int32]MutualExclusionServiceClient),
+		NodeConn: make(map[int32]pb.MutualExclusionServiceClient),
 		NextNode: int32((id % int32(len(nodeAddresses))) + 1), // Determine the next node in the ring
 		PrevNode: int32((id-2+int32(len(nodeAddresses))) % int32(len(nodeAddresses)) + 1), // Determine the previous node in the ring
 	}
@@ -43,13 +44,13 @@ func NewNode(id int32) *Node {
 			if err != nil {
 				log.Fatalf("Failed to connect to node %d at %s: %v", i+1, addr, err)
 			}
-			n.NodeConn[int32(i+1)] = NewMutualExclusionServiceClient(conn)
+			n.NodeConn[int32(i+1)] = pb.NewMutualExclusionServiceClient(conn)
 		}
 	}
 	return n
 }
 
-func (n *Node) RequestToken(ctx context.Context, req *RequestAccess) (*Empty, error) {
+func (n *Node) RequestToken(ctx context.Context, req *pb.RequestAccess) (*pb.Empty, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -74,7 +75,7 @@ func (n *Node) RequestToken(ctx context.Context, req *RequestAccess) (*Empty, er
 	return &Empty{}, nil
 }
 
-func (n *Node) ReceiveToken(ctx context.Context, token *Token) (*Empty, error) {
+func (n *Node) ReceiveToken(ctx context.Context, token *Token) (*pb.Empty, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -156,7 +157,7 @@ func main() {
 			}
 
 			grpcServer := grpc.NewServer()
-			RegisterMutualExclusionServiceServer(grpcServer, node)
+			pb.RegisterMutualExclusionServiceServer(grpcServer, node)
 			fmt.Printf("Node %d is running at %s", nodeID, nodeAddresses[nodeID-1])
 
 			if err := grpcServer.Serve(lis); err != nil {
