@@ -14,13 +14,12 @@ import (
 )
 
 var (
-    // Hardcoded list of peer addresses
+    //List of peer addresses hardcoded
     nodeAddresses = []string{"localhost:5001", "localhost:5002", "localhost:5003"}
-    // Mutex to protect critical section
     mu sync.Mutex
 )
 
-// Node represents a peer in the distributed system
+//Each Node represents a peer in the distributed system
 type Node struct {
     pb.UnimplementedMutualExclusionServiceServer
     ID       int32
@@ -30,12 +29,14 @@ type Node struct {
     NodeConn map[int32]pb.MutualExclusionServiceClient
 }
 
+/* The NewNode function configures a Node’s identity, its place in the ring structure, ensure the connection to the other nodes, 
+and enables distributed mutual exclusion through passing of the token. */
 func NewNode(id int32) *Node {
     n := &Node{
         ID:       id,
-        HasToken: id == 1, // Node 1 starts with the token
+        HasToken: id == 1, //Setting the node with ID 1 to start with the token
         NodeConn: make(map[int32]pb.MutualExclusionServiceClient),
-        NextNode: int32((id % int32(len(nodeAddresses))) + 1), // Determine the next node in the ring
+        NextNode: int32((id % int32(len(nodeAddresses))) + 1), //Determine the next node in the ring
         PrevNode: int32((id-2+int32(len(nodeAddresses))) % int32(len(nodeAddresses)) + 1),
     }
     for i, addr := range nodeAddresses {
@@ -48,37 +49,39 @@ func NewNode(id int32) *Node {
         }
     }
     return n
-
 }
 
+/* A node can request the token and if it already has the token either enter the critical section, or pass it on to another node. 
+If the node doesnt have the token, the node will forward the request. */
 func (n *Node) Request(ctx context.Context, req *pb.RequestAccess) (*pb.Empty, error) {
     mu.Lock()
     defer mu.Unlock()
 
     if n.HasToken {
         if n.ID == req.NodeId {
-            // If the node is requesting the token from itself and it has the token, enter critical section
+            //If the node is requesting the token from itself and it has the token, it will enter critical section
             fmt.Printf("Node %d already has the token and will enter the critical section\n", n.ID)
             n.enterCriticalSection()
 			mu.Unlock()
             n.releaseToken()
         } else {
-            // Grant the token to the requesting node
+            //If the node is requesting the token, and it isn't from itself, the node that has it will grant the token to the requesting node. 
             fmt.Printf("Node %d has the token and will send it to Node %d\n", n.ID, req.NodeId)
             n.HasToken = false
-            mu.Unlock() // Unlock before making the gRPC call
+            mu.Unlock()
             _, err := n.NodeConn[req.NodeId].Grant(ctx, &pb.GrantAccess{NodeId: req.NodeId})
-            mu.Lock()   // Re-lock after the gRPC call
+            mu.Lock()
             if err != nil {
                 log.Printf("Failed to send token to node %d: %v", req.NodeId, err)
-                n.HasToken = true // Reclaim the token if sending fails
+                n.HasToken = true //Making sure that the token is reclaimed if sending fails
             }
         }
     } else {
+		//If the node doesn't have the token, the node will forward the request to the next node. 
         fmt.Printf("Node %d does not have the token, forwarding the request\n", n.ID)
-        mu.Unlock() // Unlock before making the gRPC call
+        mu.Unlock()
         _, err := n.NodeConn[n.NextNode].Request(ctx, req)
-        mu.Lock()   // Re-lock after the gRPC call
+        mu.Lock()
         if err != nil {
             log.Printf("Failed to forward request to node %d: %v", n.NextNode, err)
         }
@@ -87,6 +90,8 @@ func (n *Node) Request(ctx context.Context, req *pb.RequestAccess) (*pb.Empty, e
     return &pb.Empty{}, nil
 }
 
+/* The token will be granted to the node, and then it will enter the critical section. 
+After entering the critical section, the node will release the token, so that the next node will be able to enter the critical section. */
 func (n *Node) Grant(ctx context.Context, req *pb.GrantAccess) (*pb.Empty, error) {
     mu.Lock()
     defer mu.Unlock()
@@ -94,36 +99,33 @@ func (n *Node) Grant(ctx context.Context, req *pb.GrantAccess) (*pb.Empty, error
     fmt.Printf("Node %d received the token\n", n.ID)
     n.HasToken = true
 
-    // Enter the critical section
+    //Entering the critical section
     n.enterCriticalSection()
 	mu.Unlock()
     n.releaseToken()
 
     return &pb.Empty{}, nil
-
 }
 
 func (n *Node) enterCriticalSection() {
     fmt.Printf("Node %d is entering the critical section\n", n.ID)
-    time.Sleep(2 * time.Second) // Simulate work in critical section
+    time.Sleep(2 * time.Second) //Time.Sleep should simulate the work for the node in the critical section
     fmt.Printf("Node %d is leaving the critical section\n", n.ID)
-
 }
 
 func (n *Node) releaseToken() {
     mu.Lock()
 
-    // Pass the token to the next node using the Release method
+    //Passing the token to the next node using the Release method
     fmt.Printf("Node %d is releasing the token to Node %d\n", n.ID, n.NextNode)
     n.HasToken = false
-
-    mu.Unlock() // Unlock before making the gRPC call
+    mu.Unlock()
     _, err := n.NodeConn[n.NextNode].Release(context.Background(), &pb.ReleaseAccess{NodeId: n.NextNode})
-    mu.Lock()   // Re-lock after the gRPC call
+    mu.Lock()
 
     if err != nil {
         log.Printf("Failed to release token to node %d: %v. Retrying...", n.NextNode, err)
-        n.HasToken = true // Reclaim the token if releasing fails
+		n.HasToken = true //Making sure that the token is reclaimed if releasing fails
     } else {
         fmt.Printf("Node %d successfully released the token to Node %d\n", n.ID, n.NextNode)
     }
@@ -139,10 +141,13 @@ func (n *Node) Release(ctx context.Context, req *pb.ReleaseAccess) (*pb.Empty, e
     return &pb.Empty{}, nil
 }
 
+/* Starts a simple distributed system of 3 nodes that run concurrently, where each participates in a mutual exclusion protocol by requesting a token. 
+Each node can communicate with other nodes, and periodically requests access to the critical section, simulating a distributed system.
+*/
 func main() {
     var wg sync.WaitGroup
 
-    // Start 3 nodes concurrently
+    //Program begins with 3 nodes concurrently
     for i := 1; i <= 3; i++ {
         wg.Add(1)
         nodeID := int32(i)
@@ -150,7 +155,7 @@ func main() {
             defer wg.Done()
             node := NewNode(nodeID)
 
-            // Run gRPC server
+            //Starting the gRPC server
             lis, err := net.Listen("tcp", nodeAddresses[nodeID-1])
             if err != nil {
                 log.Fatalf("Failed to listen on %s: %v", nodeAddresses[nodeID-1], err)
@@ -166,9 +171,9 @@ func main() {
                 }
             }()
 
-            // Periodically request the token
+            //Each node periodically request the token
             for {
-                time.Sleep(time.Duration(5*nodeID) * time.Second) // Each node waits different time before requesting
+                time.Sleep(time.Duration(5 * nodeID) * time.Second) //Each node waits some time before requesting
                 fmt.Printf("Node %d is requesting the token\n", nodeID)
                 _, err := node.Request(context.Background(), &pb.RequestAccess{NodeId: nodeID})
                 if err != nil {
