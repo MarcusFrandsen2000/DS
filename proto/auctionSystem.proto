@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package auctionSystem;
+option go_package = "./proto";
+
+service AuctionService {
+    rpc Bid (BidRequest) returns (BidResponse);
+    rpc Result (ResultRequest) returns (ResultResponse);
+}
+
+message BidRequest {
+    int32 amount = 1;
+}
+
+message BidResponse {
+    string status = 1;
+    int32 highestBid = 2;
+}
+
+message ResultRequest {}
+
+message ResultResponse {
+    string outcome = 1;
+    int32 highestBid = 2;
+}
