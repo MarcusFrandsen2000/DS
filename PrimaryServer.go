@@ -1,0 +1,91 @@
+package main
+
+import (
+	"context"
+    "log"
+    "net"
+
+    "google.golang.org/grpc"
+	pb "DS/proto"
+)
+
+type PrimaryServer struct {
+	pb.UnimplementedAuctionServiceServer
+	bidders []int32
+	highestBid int32
+	highestBidder int32
+	timeframe int32
+	backupServer pb.AuctionServiceClient
+}
+
+func (s *PrimaryServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidResponse, error){
+	if req.Amount > s.highestBid {
+		exists := false
+        for _, id := range s.bidders {
+            if id == req.ClientID {
+                exists = true
+                break
+            }
+        }
+
+        if !exists {
+            s.bidders = append(s.bidders, req.ClientID)
+        }
+
+        s.highestBid = req.Amount
+		s.highestBidder = req.ClientID
+		s.timeframe++
+
+		auctionState := &pb.AuctionState{
+			HighestBid: s.highestBid,
+			HighestBidder: s.highestBidder,
+			Timeframe: s.timeframe,
+		}
+
+		_, err := s.backupServer.SyncAuctionState(context.Background(), auctionState)
+		if err != nil {
+			log.Println("Error syncing with backup:", err)
+			return &pb.BidResponse{
+				Status: false, 
+				Message: "Failed to sync with backup. Bid not accepted", 
+				Bid: req.Amount,
+			}, err
+		}
+
+		return &pb.BidResponse{
+			Status: true, 
+			Message: "Bid accepted: ", 
+			Bid: req.Amount,
+		}, nil
+    }
+
+	return &pb.BidResponse{
+		Status: false, 
+		Message: "Bid not accepted. Bid too low: ", 
+		Bid: req.Amount,
+	}, nil
+}
+
+func (s *PrimaryServer) Result(ctx context.Context, req *pb.ResultRequest) (*pb.ResultResponse, error){
+	return &pb.ResultResponse{
+		HighestBid: s.highestBid,
+		HighestBidder: s.highestBidder,
+	}, nil
+}
+
+func main(){
+	listener, err := net.Listen("tcp", ":50051")
+
+	if err != nil {
+		log.Fatalf("Failed to listen to server: %v", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterAuctionServiceServer(grpcServer, &PrimaryServer{})
+
+	log.Printf("Auction server is running on port 50051")
+
+	if err := grpcServer.Serve(listener); err != nil {
+        log.Fatalf("Failed to serve: %v", err)
+    }
+}

@@ -9,23 +9,26 @@ import (
 	pb "DS/proto"
 )
 
-type AuctionServer struct {
+type Auction struct {
 	pb.UnimplementedAuctionServiceServer
 	highestBid int32
+	highestBidder int32 
+	timeframe int64
 }
 
-func (s *AuctionServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidResponse, error){
+func (s *Auction) Bid(ctx context.Context, req *pb.BidRequest, clientId int32) (*pb.BidResponse, error){
 	if req.Amount > s.highestBid {
         s.highestBid = req.Amount
+		s.highestBidder = req.ClientID
     }
 
 	return &pb.BidResponse{
-        Status:     "Bid has been received",
+        Status:     true,
         HighestBid: s.highestBid,
     }, nil
 }
 
-func (s *AuctionServer) Result(ctx context.Context, req *pb.ResultRequest) (*pb.ResultResponse, error){
+func (s *Auction) Result(ctx context.Context, req *pb.ResultRequest) (*pb.ResultResponse, error){
 	return &pb.ResultResponse{
 		Outcome: "Current highest Bid",
 		HighestBid: s.highestBid,
@@ -40,7 +43,7 @@ func main(){
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterAuctionServiceServer(grpcServer, &AuctionServer{})
+	pb.RegisterAuctionServiceServer(grpcServer, &Auction{})
 
 	log.Printf("Auction server is running on port 50051")
 

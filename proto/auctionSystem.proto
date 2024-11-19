@@ -6,20 +6,34 @@ option go_package = "./proto";
 service AuctionService {
     rpc Bid (BidRequest) returns (BidResponse);
     rpc Result (ResultRequest) returns (ResultResponse);
+    rpc syncAuctionState (AuctionState) returns (Ack);
 }
 
 message BidRequest {
     int32 amount = 1;
+    int32 clientID = 2;
 }
 
 message BidResponse {
-    string status = 1;
-    int32 highestBid = 2;
+    bool status = 1;
+    int32 bid = 2;
+    string message = 3;
 }
 
+//result is highest bid 
 message ResultRequest {}
 
 message ResultResponse {
-    string outcome = 1;
-    int32 highestBid = 2;
+    int32 highestBid = 1;
+    int32 highest_bidder = 2;
+}
+
+message AuctionState {
+    int32 highest_bid = 1;
+    int32 highest_bidder = 2;
+    int32 timeframe = 3;
+}
+
+message Ack {
+    bool success = 1;
 }
