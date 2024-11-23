@@ -7,6 +7,7 @@ service AuctionService {
     rpc Bid (BidRequest) returns (BidResponse);
     rpc Result (ResultRequest) returns (ResultResponse);
     rpc syncAuctionState (AuctionState) returns (Ack);
+    rpc checkSignal(SignalRequest) returns (SignalResponse);
 }
 
 message BidRequest {
@@ -37,4 +38,12 @@ message AuctionState {
 
 message Ack {
     bool success = 1;
+}
+
+message SignalRequest {
+
+}
+
+message SignalResponse {
+
 }

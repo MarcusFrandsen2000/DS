@@ -22,6 +22,7 @@ const (
 	AuctionService_Bid_FullMethodName              = "/auctionSystem.AuctionService/Bid"
 	AuctionService_Result_FullMethodName           = "/auctionSystem.AuctionService/Result"
 	AuctionService_SyncAuctionState_FullMethodName = "/auctionSystem.AuctionService/syncAuctionState"
+	AuctionService_CheckSignal_FullMethodName      = "/auctionSystem.AuctionService/checkSignal"
 )
 
 // AuctionServiceClient is the client API for AuctionService service.
@@ -31,6 +32,7 @@ type AuctionServiceClient interface {
 	Bid(ctx context.Context, in *BidRequest, opts ...grpc.CallOption) (*BidResponse, error)
 	Result(ctx context.Context, in *ResultRequest, opts ...grpc.CallOption) (*ResultResponse, error)
 	SyncAuctionState(ctx context.Context, in *AuctionState, opts ...grpc.CallOption) (*Ack, error)
+	CheckSignal(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error)
 }
 
 type auctionServiceClient struct {
@@ -71,6 +73,16 @@ func (c *auctionServiceClient) SyncAuctionState(ctx context.Context, in *Auction
 	return out, nil
 }
 
+func (c *auctionServiceClient) CheckSignal(ctx context.Context, in *SignalRequest, opts ...grpc.CallOption) (*SignalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SignalResponse)
+	err := c.cc.Invoke(ctx, AuctionService_CheckSignal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuctionServiceServer is the server API for AuctionService service.
 // All implementations must embed UnimplementedAuctionServiceServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type AuctionServiceServer interface {
 	Bid(context.Context, *BidRequest) (*BidResponse, error)
 	Result(context.Context, *ResultRequest) (*ResultResponse, error)
 	SyncAuctionState(context.Context, *AuctionState) (*Ack, error)
+	CheckSignal(context.Context, *SignalRequest) (*SignalResponse, error)
 	mustEmbedUnimplementedAuctionServiceServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedAuctionServiceServer) Result(context.Context, *ResultRequest)
 }
 func (UnimplementedAuctionServiceServer) SyncAuctionState(context.Context, *AuctionState) (*Ack, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncAuctionState not implemented")
+}
+func (UnimplementedAuctionServiceServer) CheckSignal(context.Context, *SignalRequest) (*SignalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckSignal not implemented")
 }
 func (UnimplementedAuctionServiceServer) mustEmbedUnimplementedAuctionServiceServer() {}
 func (UnimplementedAuctionServiceServer) testEmbeddedByValue()                        {}
@@ -172,6 +188,24 @@ func _AuctionService_SyncAuctionState_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuctionService_CheckSignal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuctionServiceServer).CheckSignal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuctionService_CheckSignal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuctionServiceServer).CheckSignal(ctx, req.(*SignalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuctionService_ServiceDesc is the grpc.ServiceDesc for AuctionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var AuctionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "syncAuctionState",
 			Handler:    _AuctionService_SyncAuctionState_Handler,
+		},
+		{
+			MethodName: "checkSignal",
+			Handler:    _AuctionService_CheckSignal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
