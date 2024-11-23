@@ -83,8 +83,7 @@ func main(){
 	grpcServer := grpc.NewServer()
 	pb.RegisterAuctionServiceServer(grpcServer, &PrimaryServer{})
 
-	log.Printf("Auction server is running on port 50051")
-
+	log.Printf("Auction server is running on port :50051")
 	if err := grpcServer.Serve(listener); err != nil {
         log.Fatalf("Failed to serve: %v", err)
     }
