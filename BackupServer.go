@@ -45,7 +45,7 @@ func main(){
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterAuctionServiceServer(grpcServer, &PrimaryServer{})
+	pb.RegisterAuctionServiceServer(grpcServer, &BackupServer{})
 
 	log.Printf("The Backup Server is running on port :50052")
 	if err := grpcServer.Serve(listener); err != nil {

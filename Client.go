@@ -5,11 +5,11 @@ import (
 	"log"
 	"math/rand"
 	"time"
+	"sync"
 
 	pb "DS/proto"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/internal/status"
 )
 
 type Client struct {
@@ -34,40 +34,25 @@ func NewClient(id int32, address string) (*Client, error) {
     }, nil
 }
 
-func (c *Client) placeBid(){
+func (c *Client) placeBid(amount int32) (*pb.BidResponse, error){
 	// Step 1: Create a context with a timeout of 1 second.
     ctx, cancel := context.WithTimeout(context.Background(), time.Second)
     // Step 2: Ensure the context is cancelled when the function completes.
     defer cancel()
 
-	status, err := c.client.Result(ctx, &pb.ResultRequest{})
-
-	if err != nil {
-		return
-	}
-	if status.HighestBidder == c.id {
-		log.Printf("%d is already the highest bidder", c.id)
-		return
-	}
-	if c.money <= status.HighestBid {
-		log.Printf("%d doesnt have enough money to place a higher bid", c.id)
-		return
-	}
-
 	response, err := c.client.Bid(ctx, &pb.BidRequest{
-		Amount: status.HighestBid + 1,
+		Amount: amount,
 		ClientID: c.id,
 	})
 
 	if err != nil {
-		log.Fatalf("Failed to place bid: %v", err)
+		return nil, err
 	}
 
-	//If the call was successful, print the response message.
-	log.Println("Bid response:", response.Message, response.Bid)
+	return response, err
 }
 
-func (c *Client) getState(){
+func (c *Client) getState() (*pb.ResultResponse){
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
@@ -76,42 +61,43 @@ func (c *Client) getState(){
 		log.Fatalf("Failed to get the state of the Auction (highest bid)", err)
 	}
 
-	log.Printf("The highest bid of the auction is currently: %v by %s\n", status.HighestBid, status.HighestBidder)
+	return status
 }
 
 func main(){
-	status, err := c.client.Result(ctx, &pb.ResultRequest{})
+	var wg sync.WaitGroup
 
-	if err != nil {
-		return
+	for i := 1; i < 4; i++ {
+		wg.Add(1)
+		clientID := int32(i)
+		go func(clientID int32) {
+			defer wg.Done()
+			client, err := NewClient(clientID, "localhost:50051")
+
+			if err != nil {
+				log.Fatalf("Failed to create client %d", clientID)
+			}
+
+			for {
+                time.Sleep(time.Duration(5 * clientID) * time.Second) //Each node waits some time before requesting
+                log.Printf("Client %d is requesting Auction State\n", clientID)
+				status := client.getState()
+				if status.HighestBidder == clientID {
+					log.Printf("%d is already the highest bidder", clientID)
+				} else if client.money <= status.HighestBid {
+					log.Printf("%d doesnt have enough money to place a higher bid", clientID)
+				} else {
+					bidResp, err := client.placeBid(status.HighestBid + 1)
+
+					if err != nil {
+						log.Fatalf("Error placing bid: %v", err)
+						return
+					}
+
+					log.Printf("%s %d", bidResp.Message, bidResp.Bid)
+				}
+            }
+		}(clientID)
 	}
-	if status.HighestBidder == Client.id {
-		log.Printf("%d is already the highest bidder", c.id)
-		return
-	}
-	if c.money <= status.HighestBid {
-		log.Printf("%d doesnt have enough money to place a higher bid", c.id)
-		return
-	}
-
-
-
-
-	bidResp, err := node.placeBid
-
-	if err != nil {
-        log.Fatalf("Error placing bid: %v", err)
-    }
-
-	log.Printf("Bid response: %v, Highest Bid %d", bidResp.Status, bidResp.HighestBid)
-
-	// Query for the current highest bid
-	time.Sleep(time.Second * 1)
-	resultResp, err := node.Result(context.Background(), &pb.ResultRequest{})
-
-	if err != nil {
-        log.Fatalf("Error getting result: %v", err)
-    }
-
-	log.Printf("Result response: %v, Highest Bid %d", resultResp.Outcome, resultResp.HighestBid)
+	wg.Wait()
 }

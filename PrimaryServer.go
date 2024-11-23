@@ -19,6 +19,7 @@ type PrimaryServer struct {
 }
 
 func (s *PrimaryServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidResponse, error){
+	log.Printf("We are in the Bid func\nhighestBid = %d\nhighestBidder = %d", s.highestBid, s.highestBidder)
 	if req.Amount > s.highestBid {
 		exists := false
         for _, id := range s.bidders {
@@ -67,6 +68,7 @@ func (s *PrimaryServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidRes
 }
 
 func (s *PrimaryServer) Result(ctx context.Context, req *pb.ResultRequest) (*pb.ResultResponse, error){
+	log.Printf("We are in the Result func\nhighestBid = %d\nhighestBidder = %d", s.highestBid, s.highestBidder)
 	return &pb.ResultResponse{
 		HighestBid: s.highestBid,
 		HighestBidder: s.highestBidder,
@@ -75,6 +77,8 @@ func (s *PrimaryServer) Result(ctx context.Context, req *pb.ResultRequest) (*pb.
 
 func main(){
 	listener, err := net.Listen("tcp", ":50051")
+
+
 
 	if err != nil {
 		log.Fatalf("Failed to listen to server: %v", err)
