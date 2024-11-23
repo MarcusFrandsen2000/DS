@@ -79,13 +79,14 @@ func main(){
 			}
 
 			for {
-                time.Sleep(time.Duration(5 * clientID) * time.Second) //Each node waits some time before requesting
+                time.Sleep(time.Duration(5) * time.Second) //Each node waits some time before requesting
                 log.Printf("Client %d is requesting Auction State\n", clientID)
 				status := client.getState()
+
 				if status.HighestBidder == clientID {
-					log.Printf("%d is already the highest bidder", clientID)
+					log.Printf("Client %d is already the highest bidder", clientID)
 				} else if client.money <= status.HighestBid {
-					log.Printf("%d doesnt have enough money to place a higher bid", clientID)
+					log.Printf("Client %d doesnt have enough money to place a higher bid", clientID)
 				} else {
 					bidResp, err := client.placeBid(status.HighestBid + 1)
 
@@ -94,7 +95,7 @@ func main(){
 						return
 					}
 
-					log.Printf("%s %d", bidResp.Message, bidResp.Bid)
+					log.Printf("%sClient %d bid %d", bidResp.Message, clientID, bidResp.Bid)
 				}
             }
 		}(clientID)

@@ -26,6 +26,7 @@ message ResultRequest {}
 message ResultResponse {
     int32 highestBid = 1;
     int32 highest_bidder = 2;
+    int32 timeframe = 3;
 }
 
 message AuctionState {

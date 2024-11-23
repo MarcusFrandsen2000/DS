@@ -18,8 +18,17 @@ type PrimaryServer struct {
 	backupServer pb.AuctionServiceClient
 }
 
+func NewPrimaryServer(backupServer pb.AuctionServiceClient) *PrimaryServer {
+    return &PrimaryServer{
+        bidders:       []int32{},
+        highestBid:    50,
+        highestBidder: 0,
+        timeframe:     0,
+        backupServer:  backupServer, // The gRPC client for communicating with BackupServer
+    }
+}
+
 func (s *PrimaryServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidResponse, error){
-	log.Printf("We are in the Bid func\nhighestBid = %d\nhighestBidder = %d", s.highestBid, s.highestBidder)
 	if req.Amount > s.highestBid {
 		exists := false
         for _, id := range s.bidders {
@@ -68,24 +77,32 @@ func (s *PrimaryServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidRes
 }
 
 func (s *PrimaryServer) Result(ctx context.Context, req *pb.ResultRequest) (*pb.ResultResponse, error){
-	log.Printf("We are in the Result func\nhighestBid = %d\nhighestBidder = %d", s.highestBid, s.highestBidder)
 	return &pb.ResultResponse{
 		HighestBid: s.highestBid,
 		HighestBidder: s.highestBidder,
+		Timeframe: s.timeframe,
 	}, nil
 }
 
 func main(){
+	// Start the backup server connection
+    backupConn, err := grpc.Dial("localhost:50052", grpc.WithInsecure())
+    if err != nil {
+        log.Fatalf("Failed to connect to backup server: %v", err)
+    }
+    defer backupConn.Close()
+
+	backupClient := pb.NewAuctionServiceClient(backupConn)
+
 	listener, err := net.Listen("tcp", ":50051")
-
-
 
 	if err != nil {
 		log.Fatalf("Failed to listen to server: %v", err)
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterAuctionServiceServer(grpcServer, &PrimaryServer{})
+	primaryServer := NewPrimaryServer(backupClient)
+	pb.RegisterAuctionServiceServer(grpcServer, primaryServer)
 
 	log.Printf("Auction server is running on port :50051")
 	if err := grpcServer.Serve(listener); err != nil {

@@ -17,6 +17,15 @@ type BackupServer struct {
 	timeframe int32
 }
 
+func NewBackupServer() *BackupServer {
+    return &BackupServer{
+        bidders:      []int32{},
+        highestBid:   0,
+        highestBidder: 0,
+        timeframe:    0,
+    }
+}
+
 func (s *BackupServer) SyncAuctionState(ctx context.Context, req *pb.AuctionState) (*pb.Ack, error){
 	s.highestBid = req.HighestBid
 	s.highestBidder = req.HighestBidder
@@ -33,7 +42,7 @@ func (s *BackupServer) SyncAuctionState(ctx context.Context, req *pb.AuctionStat
 		s.bidders = append(s.bidders, req.HighestBidder)
 	}
 
-	log.Printf("The Backup Server has succesfully been updated with highest bid: %d by %s", s.highestBid, s.highestBidder)
+	log.Printf("The Backup Server has succesfully been updated with highest bid: %d by Client %d", s.highestBid, s.highestBidder)
 	return &pb.Ack{Success: true}, nil
 }
 
@@ -45,7 +54,8 @@ func main(){
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterAuctionServiceServer(grpcServer, &BackupServer{})
+	backupServer := NewBackupServer() 
+	pb.RegisterAuctionServiceServer(grpcServer, backupServer)
 
 	log.Printf("The Backup Server is running on port :50052")
 	if err := grpcServer.Serve(listener); err != nil {
