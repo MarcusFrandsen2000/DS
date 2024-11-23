@@ -4,6 +4,7 @@ import (
 	"context"
     "log"
     "net"
+	"time"
 
     "google.golang.org/grpc"
 	pb "DS/proto"
@@ -103,6 +104,16 @@ func main(){
 	grpcServer := grpc.NewServer()
 	primaryServer := NewPrimaryServer(backupClient)
 	pb.RegisterAuctionServiceServer(grpcServer, primaryServer)
+
+	go func() {
+        for {
+            time.Sleep(2 * time.Second) // Send a heartbeat every 2 seconds
+            _, err := backupClient.CheckSignal(context.Background(), &pb.SignalRequest{})
+            if err != nil {
+                log.Println("Backup server is unreachable:", err)
+            }
+        }
+    }()
 
 	log.Printf("Auction server is running on port :50051")
 	if err := grpcServer.Serve(listener); err != nil {

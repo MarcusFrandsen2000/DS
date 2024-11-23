@@ -4,6 +4,7 @@ import (
 	"context"
     "log"
 	"net"
+	"time"
 
     "google.golang.org/grpc"
 	pb "DS/proto"
@@ -15,6 +16,14 @@ type BackupServer struct {
 	highestBid int32
 	highestBidder int32
 	timeframe int32
+	lastSignal   time.Time
+    isPrimaryServer bool
+}
+
+// Signal handler
+func (s *BackupServer) CheckSignal(ctx context.Context, req *pb.SignalRequest) (*pb.SignalResponse, error) {
+    s.lastSignal = time.Now() // Update last heartbeat time
+    return &pb.SignalResponse{}, nil
 }
 
 func NewBackupServer() *BackupServer {
@@ -56,6 +65,31 @@ func main(){
 	grpcServer := grpc.NewServer()
 	backupServer := NewBackupServer() 
 	pb.RegisterAuctionServiceServer(grpcServer, backupServer)
+
+	// Start a goroutine to monitor signals and promote to primary if necessary
+    go func() {
+        for {
+            time.Sleep(5 * time.Second) // Check every 5 seconds
+            if time.Since(backupServer.lastSignal) > 10*time.Second {
+                log.Println("No signal received from primary. Promoting backup to primary.")
+                backupServer.isPrimaryServer = true
+
+                // Close old listener and start serving as primary on port 50051
+                grpcServer.GracefulStop()
+                newListener, err := net.Listen("tcp", ":50051")
+                if err != nil {
+                    log.Fatalf("Failed to promote to primary: %v", err)
+                }
+
+                newGrpcServer := grpc.NewServer()
+                pb.RegisterAuctionServiceServer(newGrpcServer, backupServer)
+                log.Printf("Backup server promoted to primary on port :50051")
+                if err := newGrpcServer.Serve(newListener); err != nil {
+                    log.Fatalf("Failed to serve: %v", err)
+                }
+            }
+        }
+    }()
 
 	log.Printf("The Backup Server is running on port :50052")
 	if err := grpcServer.Serve(listener); err != nil {

@@ -58,7 +58,8 @@ func (c *Client) getState() (*pb.ResultResponse){
 
 	status, err := c.client.Result(ctx, &pb.ResultRequest{})
 	if err != nil {
-		log.Fatalf("Failed to get the state of the Auction (highest bid)", err)
+		log.Printf("Failed to get the state of the Auction (highest bid)", err)
+		return nil
 	}
 
 	return status
@@ -87,36 +88,40 @@ func main(){
 		log.Printf("Client %d is requesting Auction State\n", clientID)
 		status := client.getState()
 
-		// Check if the timeframe has exceeded the limit
-		if status.Timeframe > auctionTimeframeLimit {
-			log.Printf("Client %d: Auction timeframe has exceeded the limit. Stopping bidding.", clientID)
-			break
-		}
-
-		if status.HighestBidder == clientID {
-			log.Printf("Client %d is already the highest bidder", clientID)
-			highestBidderCounter++
-			if highestBidderCounter == 3 {
-				log.Printf("Going once")
-				time.Sleep(time.Duration(2) * time.Second)
-				log.Printf("Going twice")
-				time.Sleep(time.Duration(2) * time.Second)
-				log.Printf("SOOOOLD to Client %d for %d dollars", status.HighestBidder, status.HighestBid)
+		if status == nil {
+			time.Sleep(time.Duration(10) * time.Second)
+		} else {
+			// Check if the timeframe has exceeded the limit
+			if status.Timeframe > auctionTimeframeLimit {
+				log.Printf("Client %d: Auction timeframe has exceeded the limit. Stopping bidding.", clientID)
 				break
 			}
-		} else if client.money <= status.HighestBid {
-			log.Printf("Client %d doesnt have enough money to place a higher bid", clientID)
-			break
-		} else {
-			bidResp, err := client.placeBid(status.HighestBid + 1)
 
-			if err != nil {
-				log.Fatalf("Error placing bid: %v", err)
-				return
+			if status.HighestBidder == clientID {
+				log.Printf("Client %d is already the highest bidder", clientID)
+				highestBidderCounter++
+				if highestBidderCounter == 3 {
+					log.Printf("Going once")
+					time.Sleep(time.Duration(2) * time.Second)
+					log.Printf("Going twice")
+					time.Sleep(time.Duration(2) * time.Second)
+					log.Printf("SOOOOLD to Client %d for %d dollars", status.HighestBidder, status.HighestBid)
+					break
+				}
+			} else if client.money <= status.HighestBid {
+				log.Printf("Client %d doesnt have enough money to place a higher bid", clientID)
+				break
+			} else {
+				bidResp, err := client.placeBid(status.HighestBid + 1)
+
+				if err != nil {
+					log.Fatalf("Error placing bid: %v", err)
+					return
+				}
+
+				log.Printf("%sClient %d bid %d", bidResp.Message, clientID, bidResp.Bid)
+				highestBidderCounter = 0
 			}
-
-			log.Printf("%sClient %d bid %d", bidResp.Message, clientID, bidResp.Bid)
-			highestBidderCounter = 0
 		}
 	}
 }
