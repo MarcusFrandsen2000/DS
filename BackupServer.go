@@ -35,6 +35,46 @@ func NewBackupServer() *BackupServer {
     }
 }
 
+func (s *BackupServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidResponse, error){
+	if req.Amount > s.highestBid {
+		exists := false
+        for _, id := range s.bidders {
+            if id == req.ClientID {
+                exists = true
+                break
+            }
+        }
+
+        if !exists {
+            s.bidders = append(s.bidders, req.ClientID)
+        }
+
+        s.highestBid = req.Amount
+		s.highestBidder = req.ClientID
+		s.timeframe++
+
+		return &pb.BidResponse{
+			Status: true, 
+			Message: "Bid accepted: ", 
+			Bid: req.Amount,
+		}, nil
+    }
+
+	return &pb.BidResponse{
+		Status: false, 
+		Message: "Bid not accepted. Bid too low: ", 
+		Bid: req.Amount,
+	}, nil
+}
+
+func (s *BackupServer) Result(ctx context.Context, req *pb.ResultRequest) (*pb.ResultResponse, error){
+	return &pb.ResultResponse{
+		HighestBid: s.highestBid,
+		HighestBidder: s.highestBidder,
+		Timeframe: s.timeframe,
+	}, nil
+}
+
 func (s *BackupServer) SyncAuctionState(ctx context.Context, req *pb.AuctionState) (*pb.Ack, error){
 	s.highestBid = req.HighestBid
 	s.highestBidder = req.HighestBidder
@@ -69,13 +109,13 @@ func main(){
 	// Start a goroutine to monitor signals and promote to primary if necessary
     go func() {
         for {
-            time.Sleep(5 * time.Second) // Check every 5 seconds
-            if time.Since(backupServer.lastSignal) > 10*time.Second {
+            time.Sleep(2 * time.Second) // Check every 2 seconds
+            if time.Since(backupServer.lastSignal) > 5*time.Second {
                 log.Println("No signal received from primary. Promoting backup to primary.")
                 backupServer.isPrimaryServer = true
 
                 // Close old listener and start serving as primary on port 50051
-                grpcServer.GracefulStop()
+                // grpcServer.Stop()
                 newListener, err := net.Listen("tcp", ":50051")
                 if err != nil {
                     log.Fatalf("Failed to promote to primary: %v", err)

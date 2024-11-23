@@ -58,7 +58,7 @@ func (c *Client) getState() (*pb.ResultResponse){
 
 	status, err := c.client.Result(ctx, &pb.ResultRequest{})
 	if err != nil {
-		log.Printf("Failed to get the state of the Auction (highest bid)", err)
+		log.Printf("Failed to get the state of the Auction (highest bid)")
 		return nil
 	}
 
