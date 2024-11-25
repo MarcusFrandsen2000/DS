@@ -122,8 +122,8 @@ func main(){
 				bidResp, err := client.placeBid(status.HighestBid + 1)
 
 				if err != nil {
-					log.Fatalf("Error placing bid: %v", err)
-					return
+					log.Printf("Error placing bid: %v", err)
+					break
 				}
 
 				log.Printf("%sClient %d bid %d", bidResp.Message, clientID, bidResp.Bid)

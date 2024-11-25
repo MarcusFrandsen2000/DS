@@ -120,6 +120,7 @@ func main(){
 			} else if err != nil {
                 log.Println("Backup server is unreachable:", err)
 				tryCounter++
+				primaryServer.backupServerConnected = false
             } else if !connectionEstablished {
 				log.Println("Signal to Backup server has been established")
 				primaryServer.backupServerConnected = true
