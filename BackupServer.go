@@ -32,6 +32,7 @@ func NewBackupServer() *BackupServer {
         highestBid:   0,
         highestBidder: 0,
         timeframe:    0,
+		lastSignal: time.Now(),
     }
 }
 
@@ -110,12 +111,12 @@ func main(){
     go func() {
         for {
             time.Sleep(2 * time.Second) // Check every 2 seconds
-            if time.Since(backupServer.lastSignal) > 5*time.Second {
+			
+            if time.Since(backupServer.lastSignal) > 20*time.Second {
                 log.Println("No signal received from primary. Promoting backup to primary.")
                 backupServer.isPrimaryServer = true
 
-                // Close old listener and start serving as primary on port 50051
-                // grpcServer.Stop()
+                // Start serving as primary on port 50051
                 newListener, err := net.Listen("tcp", ":50051")
                 if err != nil {
                     log.Fatalf("Failed to promote to primary: %v", err)

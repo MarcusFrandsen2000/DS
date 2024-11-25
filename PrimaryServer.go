@@ -4,7 +4,7 @@ import (
 	"context"
     "log"
     "net"
-	"time"
+    "time"
 
     "google.golang.org/grpc"
 	pb "DS/proto"
@@ -17,6 +17,7 @@ type PrimaryServer struct {
 	highestBidder int32
 	timeframe int32
 	backupServer pb.AuctionServiceClient
+	backupServerConnected bool
 }
 
 func NewPrimaryServer(backupServer pb.AuctionServiceClient) *PrimaryServer {
@@ -26,6 +27,7 @@ func NewPrimaryServer(backupServer pb.AuctionServiceClient) *PrimaryServer {
         highestBidder: 0,
         timeframe:     0,
         backupServer:  backupServer, // The gRPC client for communicating with BackupServer
+		backupServerConnected: false,
     }
 }
 
@@ -47,20 +49,22 @@ func (s *PrimaryServer) Bid(ctx context.Context, req *pb.BidRequest) (*pb.BidRes
 		s.highestBidder = req.ClientID
 		s.timeframe++
 
-		auctionState := &pb.AuctionState{
-			HighestBid: s.highestBid,
-			HighestBidder: s.highestBidder,
-			Timeframe: s.timeframe,
-		}
+		if s.backupServerConnected {
+			auctionState := &pb.AuctionState{
+				HighestBid: s.highestBid,
+				HighestBidder: s.highestBidder,
+				Timeframe: s.timeframe,
+			}
 
-		_, err := s.backupServer.SyncAuctionState(context.Background(), auctionState)
-		if err != nil {
-			log.Println("Error syncing with backup:", err)
-			return &pb.BidResponse{
-				Status: false, 
-				Message: "Failed to sync with backup. Bid not accepted", 
-				Bid: req.Amount,
-			}, err
+			_, err := s.backupServer.SyncAuctionState(context.Background(), auctionState)
+			if err != nil {
+				log.Println("Error syncing with backup:", err)
+				return &pb.BidResponse{
+					Status: false, 
+					Message: "Failed to sync with backup. Bid not accepted", 
+					Bid: req.Amount,
+				}, err
+			}
 		}
 
 		return &pb.BidResponse{
@@ -86,6 +90,7 @@ func (s *PrimaryServer) Result(ctx context.Context, req *pb.ResultRequest) (*pb.
 }
 
 func main(){
+	tryCounter := 0
 	// Start the backup server connection
     backupConn, err := grpc.Dial("localhost:50052", grpc.WithInsecure())
     if err != nil {
@@ -106,12 +111,20 @@ func main(){
 	pb.RegisterAuctionServiceServer(grpcServer, primaryServer)
 
 	go func() {
+		connectionEstablished := false
         for {
             time.Sleep(2 * time.Second) // Send a heartbeat every 2 seconds
             _, err := backupClient.CheckSignal(context.Background(), &pb.SignalRequest{})
-            if err != nil {
+            if tryCounter > 10 {
+				break
+			} else if err != nil {
                 log.Println("Backup server is unreachable:", err)
-            }
+				tryCounter++
+            } else if !connectionEstablished {
+				log.Println("Signal to Backup server has been established")
+				primaryServer.backupServerConnected = true
+				connectionEstablished = true
+			}
         }
     }()
 

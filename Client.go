@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 	"fmt"
+	"os"
+	"strconv"
 
 	pb "DS/proto"
 
@@ -66,17 +68,22 @@ func (c *Client) getState() (*pb.ResultResponse){
 }
 
 func main(){
+	if len(os.Args) < 2 {
+        log.Fatalf("Usage: %s <participant_id>", os.Args[0])
+    }
+
 	highestBidderCounter := 0
 	auctionTimeframeLimit := int32(100)
-	// Prompt user to enter a client ID
-	var clientID int32
-	fmt.Print("Enter the client ID (as an integer): ")
 
-	// Use fmt.Scan() to get the user input
-	_, err := fmt.Scan(&clientID)
+	clientIDInt, err := strconv.Atoi(os.Args[1])
 	if err != nil {
-		log.Fatalf("Error reading client ID: %v", err)
+		fmt.Printf("Invalid client ID: %v\n", err)
+		return
 	}
+
+	// Convert to int32
+	clientID := int32(clientIDInt)
+
 	client, err := NewClient(clientID, "localhost:50051")
 
 	if err != nil {
